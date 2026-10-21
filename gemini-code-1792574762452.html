@@ -364,7 +364,6 @@
         const modelURL = TM_MODEL_URL.endsWith('/') ? TM_MODEL_URL + 'model.json' : TM_MODEL_URL + '/model.json';
         const metadataURL = TM_MODEL_URL.endsWith('/') ? TM_MODEL_URL + 'metadata.json' : TM_MODEL_URL + '/metadata.json';
 
-        // 載入 Google Teachable Machine 模型
         tmModel = await tmImage.load(modelURL, metadataURL);
         maxPredictions = tmModel.getTotalClasses();
 
@@ -383,22 +382,18 @@
 
       const video = document.getElementById('webcam');
       if (video && video.readyState === 4 && tmModel) {
-        // 透過 Teachable Machine 模型進行推論
         const predictions = await tmModel.predict(video);
         renderPredictionBars(predictions);
 
-        // 取得機率最高的第一名類別
         const topResult = predictions[0];
         const statusBadge = document.getElementById('scan-status');
 
-        // 【關鍵防誤判】：若被判定為 Background（空桌子）或機率小於 85%
         if (topResult.className.toLowerCase().includes('background') || topResult.probability < 0.85) {
           statusBadge.innerText = 'WAITING (無零件 / 背景)';
           statusBadge.className = 'text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700';
         } else {
-          // 確實偵測到零件類別且信心度 > 85%
           const now = Date.now();
-          if (now - lastIdentifiedTime > 2500) { // 2.5 秒冷卻防連鎖觸發
+          if (now - lastIdentifiedTime > 2500) {
             lastIdentifiedTime = now;
             matchItemByName(topResult.className, Math.round(topResult.probability * 100));
           }
@@ -431,10 +426,8 @@
 
     function matchItemByName(className, conf) {
       const all = getAllItems();
-      // 在零件目錄中模糊比對名稱
       let matched = all.find(it => className.toLowerCase().includes(it.name.toLowerCase()) || it.name.toLowerCase().includes(className.toLowerCase()));
       
-      // 若找不到完全相同，建立即時對照
       if (!matched) {
         matched = {
           id: 'tm-' + className,
@@ -479,7 +472,6 @@
           isWebcamOn = true;
           lucide.createIcons();
 
-          // 啟動連續推論迴圈
           predictLoop();
         } catch (err) {
           alert('無法開啟相機：' + err.message);
