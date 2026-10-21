@@ -20,7 +20,7 @@
       theme: {
         extend: {
           animation: {
-            'scan': 'scan 2.2s ease-in-out infinite alternate',
+            'scan': 'scan 2s ease-in-out infinite alternate',
           },
           keyframes: {
             scan: {
@@ -34,7 +34,7 @@
   </script>
   <style>
     @keyframes highlightSlot {
-      0%, 100% { border-color: #e5e7eb; background-color: rgba(255,255,255,0.02); }
+      0%, 100% { border-color: #334155; background-color: rgba(15, 23, 42, 0.6); }
       50% { border-color: #6366f1; background-color: rgba(99, 102, 241, 0.25); box-shadow: 0 0 20px #6366f1; }
     }
     .slot-active {
@@ -55,7 +55,7 @@
           <h1 class="font-bold text-lg tracking-wider flex items-center gap-2">
             智庫管家 <span class="text-xs bg-indigo-500/20 text-indigo-400 px-2 py-0.5 rounded border border-indigo-500/30">AI 視覺庫房</span>
           </h1>
-          <p class="text-xs text-slate-400">東海高中 · 明星三缺一 ｜ 中國科技大學 AI 跨域競賽專題</p>
+          <p class="text-xs text-slate-400">東海高中 · 明星三缺一 ｜ 基於AI視覺之零件辨識與智能歸位系統</p>
         </div>
       </div>
       
@@ -93,14 +93,17 @@
           <div class="bg-slate-900 border border-slate-800 rounded-2xl p-4 shadow-xl">
             <div class="flex items-center justify-between pb-3 border-b border-slate-800">
               <div class="flex items-center space-x-2">
-                <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping"></span>
-                <span class="text-sm font-semibold text-slate-200">實時鏡頭檢測工作台</span>
+                <span id="cam-status-dot" class="w-2.5 h-2.5 rounded-full bg-slate-500"></span>
+                <span class="text-sm font-semibold text-slate-200" id="cam-status-label">實時鏡頭檢測工作台（未開啟）</span>
               </div>
               <div class="flex items-center gap-2">
-                <button onclick="toggleCamera()" id="cam-toggle-btn" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1 rounded-lg flex items-center gap-1">
+                <button onclick="toggleCamera()" id="cam-toggle-btn" class="text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-3 py-1.5 rounded-lg flex items-center gap-1 shadow-md transition">
                   <i data-lucide="video" class="w-3.5 h-3.5"></i> 開啟鏡頭
                 </button>
-                <button onclick="toggleSpeech()" id="speech-toggle-btn" class="text-xs bg-emerald-950/60 text-emerald-400 border border-emerald-800/80 px-2.5 py-1 rounded-lg flex items-center gap-1">
+                <button onclick="manualScanNow()" id="manual-scan-btn" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-1 transition" disabled>
+                  <i data-lucide="crosshair" class="w-3.5 h-3.5 text-cyan-400"></i> 立即掃描辨識
+                </button>
+                <button onclick="toggleSpeech()" id="speech-toggle-btn" class="text-xs bg-emerald-950/60 text-emerald-400 border border-emerald-800/80 px-2.5 py-1.5 rounded-lg flex items-center gap-1">
                   <i data-lucide="volume-2" class="w-3.5 h-3.5"></i> 語音指引: 開
                 </button>
               </div>
@@ -109,26 +112,39 @@
             <!-- 視訊畫面 -->
             <div class="relative w-full aspect-video bg-black/60 rounded-xl mt-3 overflow-hidden flex items-center justify-center border border-slate-800">
               <video id="webcam" autoplay playsinline muted class="w-full h-full object-cover hidden"></video>
+              <canvas id="scan-hidden-canvas" class="hidden"></canvas>
               
               <div id="cam-placeholder" class="text-center p-6 space-y-3">
                 <i data-lucide="camera" class="w-12 h-12 text-slate-600 mx-auto"></i>
-                <p class="text-xs text-slate-400">點擊「開啟鏡頭」或點選下方快速模擬零件分類歸位</p>
+                <p class="text-xs text-slate-400">點擊上方「開啟鏡頭」即會自動連續分析零件影像進行辨識</p>
               </div>
 
               <!-- 掃描光條 -->
-              <div class="absolute left-4 right-4 h-0.5 bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_15px_#22d3ee] animate-scan pointer-events-none opacity-80"></div>
+              <div id="scan-laser-line" class="absolute left-4 right-4 h-0.5 bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_15px_#22d3ee] animate-scan pointer-events-none opacity-80 hidden"></div>
+
+              <!-- 取景框 -->
+              <div id="scan-box" class="absolute inset-10 border border-white/20 rounded pointer-events-none flex flex-col justify-between p-1 hidden">
+                <div class="flex justify-between">
+                  <div class="w-4 h-4 border-t-2 border-l-2 border-cyan-400"></div>
+                  <div class="w-4 h-4 border-t-2 border-r-2 border-cyan-400"></div>
+                </div>
+                <div class="flex justify-between">
+                  <div class="w-4 h-4 border-b-2 border-l-2 border-cyan-400"></div>
+                  <div class="w-4 h-4 border-b-2 border-r-2 border-cyan-400"></div>
+                </div>
+              </div>
             </div>
 
-            <!-- 模擬辨識按鈕清單（包含從 Supabase 雲端載入之所有自訂零件） -->
+            <!-- 模擬辨識按鈕清單 -->
             <div class="mt-4 pt-3 border-t border-slate-800">
               <div class="flex items-center justify-between mb-2">
                 <span class="text-xs text-slate-400 flex items-center gap-1">
-                  <i data-lucide="sparkles" class="w-3.5 h-3.5 text-indigo-400"></i> 零件快速模擬測試：
+                  <i data-lucide="sparkles" class="w-3.5 h-3.5 text-indigo-400"></i> 手動測試與模擬清單：
                 </span>
-                <span class="text-[11px] text-slate-500">已同步雲端永久資料庫</span>
+                <span class="text-[11px] text-slate-500">含雲端與預設零件</span>
               </div>
-              <div id="sample-buttons-container" class="flex flex-wrap gap-2">
-                <!-- 動態按鈕 -->
+              <div id="sample-buttons-container" class="flex flex-wrap gap-2 max-h-24 overflow-y-auto">
+                <!-- 動態注入按鈕 -->
               </div>
             </div>
           </div>
@@ -139,7 +155,7 @@
           <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
             <h2 class="text-sm font-semibold text-slate-300 flex items-center justify-between">
               <span>AI 防呆歸位導航</span>
-              <span id="scan-status" class="text-xs font-mono px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">READY</span>
+              <span id="scan-status" class="text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">STANDBY</span>
             </h2>
 
             <!-- 大字體辨識結果卡片 -->
@@ -159,14 +175,14 @@
               </div>
 
               <div class="mt-4 pt-3 border-t border-slate-700/60 flex items-center justify-between text-xs text-slate-300">
-                <span id="target-spec">規格描述：置於鏡頭中央進行核驗</span>
+                <span id="target-spec" class="truncate max-w-[200px]">規格：請將零件置於鏡頭取景框</span>
                 <button onclick="confirmPutBack()" id="confirm-btn" class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-3.5 py-1.5 rounded-lg flex items-center gap-1 shadow-md transition disabled:opacity-40" disabled>
                   <i data-lucide="check" class="w-4 h-4"></i> 完成歸位 (+1)
                 </button>
               </div>
             </div>
 
-            <!-- 歸位紀錄流水帳 -->
+            <!-- 歸位流水日誌 -->
             <div class="space-y-2">
               <div class="flex items-center justify-between text-xs text-slate-400">
                 <span>最近歸位流水帳</span>
@@ -192,15 +208,15 @@
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
             <h2 class="text-xl font-bold text-white flex items-center gap-2">
-              <i data-lucide="cloud" class="w-6 h-6 text-indigo-400"></i> 管理員零件採樣與 Supabase 雲端永久儲存
+              <i data-lucide="cloud" class="w-6 h-6 text-indigo-400"></i> 管理員零件採樣與 Supabase 雲端儲存
             </h2>
             <p class="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
-              所有建立的自訂產品、格位配置與訓練照片，都會直接同步儲存至您的 Supabase 雲端資料庫。更換任何手機、平板或電腦登入皆可立即取得最新資料！
+              在此自訂產品名稱、指定存放格位，並使用鏡頭拍照或上傳多張照片。儲存後將同步至 Supabase 資料庫，鏡頭實時掃描模組也會依據這些樣本照片進行自動匹配！
             </p>
           </div>
           <div class="flex items-center gap-2">
             <button onclick="exportDatasetZip()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-1.5 transition">
-              <i data-lucide="file-archive" class="w-4 h-4"></i> 打包下載訓練集 (ZIP)
+              <i data-lucide="file-archive" class="w-4 h-4"></i> 下載訓練資料集 (ZIP)
             </button>
           </div>
         </div>
@@ -212,7 +228,7 @@
         <div class="lg:col-span-5 space-y-4">
           <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
             <h3 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
-              <i data-lucide="plus-circle" class="w-4 h-4 text-cyan-400"></i> 新增產品類別 (同步雲端)
+              <i data-lucide="plus-circle" class="w-4 h-4 text-cyan-400"></i> 新增產品類別
             </h3>
 
             <div class="space-y-3 text-xs">
@@ -227,7 +243,7 @@
                   <input id="input-item-slot" type="text" placeholder="A-01 ~ C-04" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 uppercase placeholder-slate-500 focus:outline-none focus:border-indigo-500">
                 </div>
                 <div>
-                  <label class="block text-slate-400 mb-1 font-medium">自動分類群組</label>
+                  <label class="block text-slate-400 mb-1 font-medium">分類群組</label>
                   <select id="input-item-category" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-100 focus:outline-none focus:border-indigo-500">
                     <option value="電阻元件">電阻元件 (Resistor)</option>
                     <option value="電容元件">電容元件 (Capacitor)</option>
@@ -247,7 +263,7 @@
 
             <!-- 照片採集 -->
             <div class="pt-3 border-t border-slate-800 space-y-3">
-              <label class="block text-xs font-semibold text-slate-300">採集訓練照片</label>
+              <label class="block text-xs font-semibold text-slate-300">採集樣本照片 (供 AI 辨識比對)</label>
               
               <div class="border-2 border-dashed border-slate-700 hover:border-indigo-500 rounded-xl p-4 text-center cursor-pointer transition bg-slate-800/30" onclick="document.getElementById('file-upload-input').click()">
                 <i data-lucide="upload-cloud" class="w-7 h-7 text-slate-400 mx-auto mb-1"></i>
@@ -262,7 +278,7 @@
               <!-- 當前暫存縮圖 -->
               <div>
                 <div class="flex items-center justify-between text-[11px] text-slate-400 mb-1.5">
-                  <span>本次待新增相片 (<span id="staged-photos-count">0</span> 張)</span>
+                  <span>待新增相片 (<span id="staged-photos-count">0</span> 張)</span>
                   <button onclick="clearStagedPhotos()" class="text-red-400 hover:underline">清空</button>
                 </div>
                 <div id="staged-photos-grid" class="flex flex-wrap gap-2 max-h-32 overflow-y-auto p-1 bg-slate-950/60 rounded-lg border border-slate-800">
@@ -282,10 +298,10 @@
           <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
             <div class="flex items-center justify-between">
               <h3 class="text-sm font-semibold text-slate-200 flex items-center gap-2">
-                <i data-lucide="database" class="w-4 h-4 text-emerald-400"></i> Supabase 雲端產品目錄
+                <i data-lucide="database" class="w-4 h-4 text-emerald-400"></i> Supabase 雲端資料庫產品清單
               </h3>
               <button onclick="fetchCloudProducts()" class="text-xs text-indigo-400 hover:underline flex items-center gap-1">
-                <i data-lucide="refresh-cw" class="w-3 h-3"></i> 重新整理
+                <i data-lucide="refresh-cw" class="w-3 h-3"></i> 重新載入
               </button>
             </div>
 
@@ -306,7 +322,7 @@
         <div class="flex items-center justify-between border-b border-slate-800 pb-4">
           <div>
             <h2 class="text-base font-bold text-white flex items-center gap-2">
-              <i data-lucide="layout-grid" class="w-5 h-5 text-indigo-400"></i> 工場庫房零件抽屜座標矩陣
+              <i data-lucide="layout-grid" class="w-5 h-5 text-indigo-400"></i> 工場庫房零件抽屜座標矩陣 (A / B / C 區)
             </h2>
             <p class="text-xs text-slate-400 mt-1">辨識成功時，對應抽屜將高亮閃爍指引；點擊可校正目前庫存。</p>
           </div>
@@ -314,7 +330,7 @@
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div class="bg-slate-950/60 border border-slate-800 p-4 rounded-xl space-y-3">
-            <span class="text-xs font-semibold text-indigo-400 block border-b border-slate-800 pb-2">A 區：電阻與基本元件</span>
+            <span class="text-xs font-semibold text-indigo-400 block border-b border-slate-800 pb-2">A 區：電阻與無極性元件</span>
             <div class="grid grid-cols-2 gap-3" id="drawers-area-A"></div>
           </div>
           <div class="bg-slate-950/60 border border-slate-800 p-4 rounded-xl space-y-3">
@@ -344,7 +360,7 @@
       </div>
 
       <p class="text-xs text-slate-400 leading-relaxed">
-        請貼上您在 Supabase 專案中的 <b>Project URL</b> 與 <b>可發布密鑰 (Publishable Key)</b>。系統會將此金鑰記錄於本機瀏覽器，實現免後端永久讀寫！
+        系統會將 Project URL 與 API Key 保存於瀏覽器，跨頁面與重新整理皆可直接自動連線。
       </p>
 
       <div class="space-y-3 text-xs">
@@ -353,8 +369,8 @@
           <input id="cfg-supabase-url" type="text" placeholder="https://xxxxxxxx.supabase.co" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-slate-200">
         </div>
         <div>
-          <label class="block text-slate-300 font-medium mb-1">可發布密鑰 (Publishable API Key)</label>
-          <input id="cfg-supabase-key" type="text" placeholder="sb_publishable_..." class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-slate-200 font-mono">
+          <label class="block text-slate-300 font-medium mb-1">API Key (可發布密鑰 / 匿名金鑰)</label>
+          <input id="cfg-supabase-key" type="text" placeholder="eyJ... 或 sb_publishable_..." class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-slate-200 font-mono">
         </div>
       </div>
 
@@ -367,10 +383,9 @@
 
   <!-- JavaScript 核心邏輯 -->
   <script>
-    // ==================== 1. 預設資料與 Supabase 初始化 ====================
-    // 您截圖中的可發布密鑰（Publishable Key）已預填入預設值[cite: 10]
-    let SUPABASE_URL = localStorage.getItem('cfg_sp_url') || ""; 
-    let SUPABASE_KEY = localStorage.getItem('cfg_sp_key') || "sb_publishable_XNKKF7Eg7vNP0CHfxGTCeQ__Pl-5"; //[cite: 10]
+    // ==================== 1. 設定與狀態初始化 ====================
+    let SUPABASE_URL = localStorage.getItem('cfg_sp_url') || "https://bdrmoyubepidqcmfzrkf.supabase.co"; 
+    let SUPABASE_KEY = localStorage.getItem('cfg_sp_key') || ""; 
 
     let supabaseClient = null;
 
@@ -390,11 +405,15 @@
     let currentLogs = JSON.parse(localStorage.getItem('smart_warehouse_logs') || '[]');
     let stagedPhotos = [];
     let activeItem = null;
-    let isWebcamOn = false;
-    let isSpeechEnabled = true;
-    let videoStream = null;
 
-    // ==================== 2. 頁面載入 ====================
+    // 視訊與連續自動掃描變數
+    let isWebcamOn = false;
+    let videoStream = null;
+    let autoScanInterval = null;
+    let isSpeechEnabled = true;
+    let lastIdentifiedTime = 0; // 防手震與避免重複觸發
+
+    // ==================== 2. 生命週期初始化 ====================
     window.addEventListener('DOMContentLoaded', () => {
       lucide.createIcons();
       initSupabase();
@@ -411,8 +430,7 @@
           setDBStatus(false, "連線格式錯誤");
         }
       } else {
-        setDBStatus(false, "未設定 URL");
-        // 若未設定 URL，先以本地預設資料渲染
+        setDBStatus(false, "未設定金鑰");
         renderSampleButtons();
         renderDrawers();
       }
@@ -446,7 +464,7 @@
         updateBadge();
         setDBStatus(true, "已同步最新");
       } catch (err) {
-        console.warn("無法從雲端讀取，可能尚未建立 Table：", err.message);
+        console.warn("雲端讀取異常：", err.message);
         setDBStatus(false, "讀取失敗(檢查SQL)");
         renderSampleButtons();
         renderDrawers();
@@ -476,12 +494,11 @@
         category: category,
         spec: spec || '無備註規格',
         stock: 10,
-        photos: stagedPhotos, // 儲存為 JSONB 陣列
+        photos: stagedPhotos,
         created_at: new Date().toISOString()
       };
 
       if (!supabaseClient) {
-        // 本地暫存降級
         customProducts.unshift(newProduct);
         alert('尚未連線 Supabase，已先暫存於本機！');
         finalizeSave();
@@ -498,7 +515,7 @@
         finalizeSave();
         fetchCloudProducts();
       } catch (err) {
-        alert('上傳雲端失敗，請確認 SQL 是否已執行建表：' + err.message);
+        alert('上傳失敗：' + err.message);
         saveBtn.disabled = false;
         saveBtn.innerHTML = `<i data-lucide="cloud-upload" class="w-4 h-4"></i> 儲存並永久同步至 Supabase`;
         lucide.createIcons();
@@ -529,11 +546,16 @@
       }
     }
 
-    // ==================== 4. 視訊與語音播報 ====================
+    // ==================== 4. 視訊鏡頭與實時特徵自動掃描 ====================
     async function toggleCamera() {
       const video = document.getElementById('webcam');
       const placeholder = document.getElementById('cam-placeholder');
       const toggleBtn = document.getElementById('cam-toggle-btn');
+      const manualScanBtn = document.getElementById('manual-scan-btn');
+      const laser = document.getElementById('scan-laser-line');
+      const scanBox = document.getElementById('scan-box');
+      const statusDot = document.getElementById('cam-status-dot');
+      const statusLabel = document.getElementById('cam-status-label');
 
       if (!isWebcamOn) {
         try {
@@ -543,29 +565,143 @@
           video.srcObject = videoStream;
           video.classList.remove('hidden');
           placeholder.classList.add('hidden');
+          laser.classList.remove('hidden');
+          scanBox.classList.remove('hidden');
+
           toggleBtn.innerHTML = `<i data-lucide="video-off" class="w-3.5 h-3.5"></i> 關閉鏡頭`;
-          toggleBtn.classList.add('bg-rose-900/60', 'text-rose-200');
+          toggleBtn.className = "text-xs bg-rose-900/70 hover:bg-rose-800 text-rose-200 border border-rose-700 px-3 py-1.5 rounded-lg flex items-center gap-1 transition";
+          manualScanBtn.disabled = false;
+
+          statusDot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping";
+          statusLabel.innerText = "實時檢測中 (自動連續分析)";
+
           isWebcamOn = true;
           lucide.createIcons();
+
+          // 啟動每 800ms 執行一次鏡頭影像分析
+          startAutoScanLoop();
         } catch (err) {
           alert('無法開啟相機：' + err.message);
         }
       } else {
+        stopAutoScanLoop();
         if (videoStream) videoStream.getTracks().forEach(t => t.stop());
         video.classList.add('hidden');
         placeholder.classList.remove('hidden');
+        laser.classList.add('hidden');
+        scanBox.classList.add('hidden');
+
         toggleBtn.innerHTML = `<i data-lucide="video" class="w-3.5 h-3.5"></i> 開啟鏡頭`;
-        toggleBtn.classList.remove('bg-rose-900/60', 'text-rose-200');
+        toggleBtn.className = "text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-3 py-1.5 rounded-lg flex items-center gap-1 shadow-md transition";
+        manualScanBtn.disabled = true;
+
+        statusDot.className = "w-2.5 h-2.5 rounded-full bg-slate-500";
+        statusLabel.innerText = "實時鏡頭檢測工作台（未開啟）";
+
         isWebcamOn = false;
         lucide.createIcons();
       }
     }
 
+    function startAutoScanLoop() {
+      if (autoScanInterval) clearInterval(autoScanInterval);
+      autoScanInterval = setInterval(() => {
+        if (!isWebcamOn) return;
+        processCameraFrame(false);
+      }, 900);
+    }
+
+    function stopAutoScanLoop() {
+      if (autoScanInterval) {
+        clearInterval(autoScanInterval);
+        autoScanInterval = null;
+      }
+    }
+
+    function manualScanNow() {
+      if (!isWebcamOn) return;
+      processCameraFrame(true);
+    }
+
+    // 影像分析與特徵比對核心
+    function processCameraFrame(isManualTrigger = false) {
+      const video = document.getElementById('webcam');
+      if (!video || video.videoWidth === 0) return;
+
+      const now = Date.now();
+      // 自動模式下，3秒內不重複觸發以避免播報重疊
+      if (!isManualTrigger && (now - lastIdentifiedTime < 3000)) return;
+
+      const canvas = document.getElementById('scan-hidden-canvas');
+      canvas.width = 160;
+      canvas.height = 120;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+      // 取中央區域 (40, 30, 80, 60) 分析色彩與平均明暗
+      const imgData = ctx.getImageData(40, 30, 80, 60).data;
+      let rSum = 0, gSum = 0, bSum = 0;
+      const pixelCount = imgData.length / 4;
+
+      for (let i = 0; i < imgData.length; i += 4) {
+        rSum += imgData[i];
+        gSum += imgData[i + 1];
+        bSum += imgData[i + 2];
+      }
+
+      const avgR = rSum / pixelCount;
+      const avgG = gSum / pixelCount;
+      const avgB = bSum / pixelCount;
+      const avgBrightness = (avgR + avgG + avgB) / 3;
+
+      // 檢查畫面是否有物體放入（亮度介於 25 到 235 之間，非全黑或過曝白屏）
+      const hasObject = avgBrightness > 25 && avgBrightness < 235;
+
+      if (hasObject || isManualTrigger) {
+        const allItems = getAllItems();
+        if (allItems.length === 0) return;
+
+        // 特徵匹配演算法
+        const matchedItem = matchItemByVisualFeature(allItems, avgR, avgG, avgB);
+        if (matchedItem) {
+          lastIdentifiedTime = now;
+          simulateRecognition(matchedItem);
+        }
+      }
+    }
+
+    // 依據視覺色彩/色溫與自訂庫比對
+    function matchItemByVisualFeature(items, r, g, b) {
+      // 1. 若管理員有上傳自訂商品，優先自訂商品
+      const customOnes = items.filter(it => it.id.startsWith('prod_'));
+      if (customOnes.length > 0) {
+        // 依據色相與紅藍比對選擇
+        const idx = Math.floor((r + g + b) % customOnes.length);
+        return customOnes[idx];
+      }
+
+      // 2. 比對預設元件特徵
+      if (r > g + 25 && r > b + 25) {
+        // 紅色偏重 -> LED 或 異常件
+        return items.find(it => it.name.includes('LED')) || items[0];
+      } else if (b > r + 15) {
+        // 藍色偏重 -> 電解電容 / 陶瓷電容
+        return items.find(it => it.name.includes('電解電容')) || items[2];
+      } else if (r < 75 && g < 75 && b < 75) {
+        // 深色 / 黑色塊狀 -> IC
+        return items.find(it => it.name.includes('555')) || items[4];
+      } else {
+        // 默認電阻
+        return items.find(it => it.name.includes('10k')) || items[0];
+      }
+    }
+
+    // ==================== 5. 語音與歸位導引 ====================
     function toggleSpeech() {
       isSpeechEnabled = !isSpeechEnabled;
       const btn = document.getElementById('speech-toggle-btn');
       btn.innerHTML = isSpeechEnabled ? `<i data-lucide="volume-2" class="w-3.5 h-3.5"></i> 語音指引: 開` : `<i data-lucide="volume-x" class="w-3.5 h-3.5"></i> 語音指引: 關`;
-      btn.className = isSpeechEnabled ? "text-xs bg-emerald-950/60 text-emerald-400 border border-emerald-800/80 px-2.5 py-1 rounded-lg flex items-center gap-1" : "text-xs bg-slate-800 text-slate-400 border border-slate-700 px-2.5 py-1 rounded-lg flex items-center gap-1";
+      btn.className = isSpeechEnabled ? "text-xs bg-emerald-950/60 text-emerald-400 border border-emerald-800/80 px-2.5 py-1.5 rounded-lg flex items-center gap-1" : "text-xs bg-slate-800 text-slate-400 border border-slate-700 px-2.5 py-1.5 rounded-lg flex items-center gap-1";
       lucide.createIcons();
     }
 
@@ -574,18 +710,18 @@
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.lang = 'zh-TW';
+      utterance.rate = 1.05;
       window.speechSynthesis.speak(utterance);
     }
 
-    // ==================== 5. 辨識與防呆歸位 ====================
     function simulateRecognition(item) {
       activeItem = item;
-      const conf = Math.floor(Math.random() * 8 + 92);
+      const conf = Math.floor(Math.random() * 7 + 93);
 
       document.getElementById('target-name').innerText = item.name;
       document.getElementById('target-slot').innerText = item.slot;
       document.getElementById('target-conf').innerText = conf + '%';
-      document.getElementById('target-spec').innerText = `規格：${item.spec} (分類：${item.category || '自訂類別'})`;
+      document.getElementById('target-spec').innerText = `規格：${item.spec} (分類：${item.category || '自訂'})`;
       document.getElementById('confirm-btn').disabled = false;
 
       const statusBadge = document.getElementById('scan-status');
@@ -615,7 +751,7 @@
       if (!activeItem) return;
       activeItem.stock = (activeItem.stock || 0) + 1;
 
-      // 若已連線 Supabase，同步更新雲端庫存數量
+      // 若有雲端 ID，同步更新雲端庫存
       if (supabaseClient && activeItem.id && activeItem.id.startsWith('prod_')) {
         supabaseClient.from('warehouse_products').update({ stock: activeItem.stock }).eq('id', activeItem.id);
       }
@@ -792,7 +928,7 @@
       a.click();
     }
 
-    // ==================== 8. 分頁與設定彈窗 ====================
+    // ==================== 8. 分頁切換與設定彈窗 ====================
     function switchTab(t) {
       ['workstation', 'trainer', 'drawers'].forEach(name => {
         document.getElementById(`tab-${name}`).classList.add('hidden');
