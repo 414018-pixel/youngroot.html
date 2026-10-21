@@ -384,8 +384,8 @@
   <!-- JavaScript 核心邏輯 -->
   <script>
     // ==================== 1. 設定與狀態初始化 ====================
-    let SUPABASE_URL = localStorage.getItem('cfg_sp_url') || "https://bdrmoyubepidqcmfzrkf.supabase.co";[cite: 13]
-    let SUPABASE_KEY = localStorage.getItem('cfg_sp_key') || ""; 
+    let SUPABASE_URL = localStorage.getItem('cfg_sp_url') || "https://bdrmoyubepidqcmfzrkf.supabase.co";
+    let SUPABASE_KEY = localStorage.getItem('cfg_sp_key') || "";
 
     let supabaseClient = null;
 
@@ -414,7 +414,7 @@
     let lastIdentifiedTime = 0;
 
     // 背景校準與防誤判變數
-    let baselineBgData = null; // 記錄桌面基準 (r, g, b, edgeVariance)
+    let baselineBgData = null;
     let isCalibrated = false;
 
     // ==================== 2. 生命週期初始化 ====================
@@ -580,7 +580,7 @@
           statusLabel.innerText = "實時檢測中 (背景防誤判已啟動)";
 
           isWebcamOn = true;
-          baselineBgData = null; // 重置桌面背景基準
+          baselineBgData = null;
           isCalibrated = false;
           lucide.createIcons();
 
