@@ -175,7 +175,7 @@
               </div>
 
               <div class="mt-4 pt-3 border-t border-slate-700/60 flex items-center justify-between text-xs text-slate-300">
-                <span id="target-spec" class="truncate max-w-[200px]">規格：請將零件置於鏡頭取景框</span>
+                <span id="target-spec" class="truncate max-w-[200px]">規格：請將零件置於取景框中央</span>
                 <button onclick="confirmPutBack()" id="confirm-btn" class="bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-3.5 py-1.5 rounded-lg flex items-center gap-1 shadow-md transition disabled:opacity-40" disabled>
                   <i data-lucide="check" class="w-4 h-4"></i> 完成歸位 (+1)
                 </button>
@@ -211,7 +211,7 @@
               <i data-lucide="cloud" class="w-6 h-6 text-indigo-400"></i> 管理員零件採樣與 Supabase 雲端儲存
             </h2>
             <p class="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
-              在此自訂產品名稱、指定存放格位，並使用鏡頭拍照或上傳多張照片。儲存後將同步至 Supabase 資料庫，鏡頭辨識模組也會依據這些特徵進行自動匹配！
+              在此自訂產品名稱、指定存放格位，並使用鏡頭拍照或上傳多張照片。系統會分析照片色彩特徵並同步至 Supabase 資料庫，鏡頭辨識模組即會以該特徵嚴格比對！
             </p>
           </div>
           <div class="flex items-center gap-2">
@@ -263,7 +263,7 @@
 
             <!-- 照片採集 -->
             <div class="pt-3 border-t border-slate-800 space-y-3">
-              <label class="block text-xs font-semibold text-slate-300">採集樣本照片 (供 AI 辨識比對)</label>
+              <label class="block text-xs font-semibold text-slate-300">採集樣本照片 (供 AI 提取色彩指紋)</label>
               
               <div class="border-2 border-dashed border-slate-700 hover:border-indigo-500 rounded-xl p-4 text-center cursor-pointer transition bg-slate-800/30" onclick="document.getElementById('file-upload-input').click()">
                 <i data-lucide="upload-cloud" class="w-7 h-7 text-slate-400 mx-auto mb-1"></i>
@@ -389,16 +389,16 @@
 
     let supabaseClient = null;
 
-    // 內建標準 8 類零件 (企劃書規格)
+    // 內建標準 8 類零件 (附帶顏色特徵特徵質 R, G, B)
     const defaultCatalog = [
-      { id: 'def-1', name: '10kΩ 四色碼電阻', slot: 'A-01', category: '電阻元件', spec: '1/4W 5% 碳膜 (棕黑橙金)', stock: 85, color: '#6366f1' },
-      { id: 'def-2', name: '1kΩ 四色碼電阻', slot: 'A-02', category: '電阻元件', spec: '1/4W 5% 碳膜 (棕黑紅金)', stock: 42, color: '#6366f1' },
-      { id: 'def-3', name: '104 陶瓷電容 (0.1uF)', slot: 'A-03', category: '電容元件', spec: '耐壓 50V 陶瓷無極性', stock: 120, color: '#38bdf8' },
-      { id: 'def-4', name: '220uF 電解電容', slot: 'B-01', category: '電容元件', spec: '25V 鋁質電解 / 具長短腳極性', stock: 18, color: '#38bdf8' },
-      { id: 'def-5', name: '555 計時晶片 (NE555)', slot: 'C-01', category: '半導體IC', spec: 'DIP-8 封裝 / 脈衝產生', stock: 9, color: '#c084fc' },
-      { id: 'def-6', name: '5mm 紅色發光二極體', slot: 'B-02', category: '光電元件', spec: 'VF=1.8~2.2V / 長正短負', stock: 65, color: '#f43f5e' },
-      { id: 'def-7', name: '1N4007 整流二極體', slot: 'B-03', category: '半導體IC', spec: '1A 1000V DO-41', stock: 35, color: '#38bdf8' },
-      { id: 'def-8', name: '異常/破損零件', slot: 'A-04', category: '報廢隔離', spec: '請放置於隔離檢驗盒', stock: 4, color: '#f59e0b', isWarning: true }
+      { id: 'def-1', name: '10kΩ 四色碼電阻', slot: 'A-01', category: '電阻元件', spec: '1/4W 5% 碳膜 (棕黑橙金)', stock: 85, color: '#6366f1', colorR: 135, colorG: 110, colorB: 85 },
+      { id: 'def-2', name: '1kΩ 四色碼電阻', slot: 'A-02', category: '電阻元件', spec: '1/4W 5% 碳膜 (棕黑紅金)', stock: 42, color: '#6366f1', colorR: 125, colorG: 100, colorB: 75 },
+      { id: 'def-3', name: '104 陶瓷電容 (0.1uF)', slot: 'A-03', category: '電容元件', spec: '耐壓 50V 陶瓷無極性', stock: 120, color: '#38bdf8', colorR: 190, colorG: 130, colorB: 60 },
+      { id: 'def-4', name: '220uF 電解電容', slot: 'B-01', category: '電容元件', spec: '25V 鋁質電解 / 具長短腳極性', stock: 18, color: '#38bdf8', colorR: 35, colorG: 85, colorB: 150 },
+      { id: 'def-5', name: '555 計時晶片 (NE555)', slot: 'C-01', category: '半導體IC', spec: 'DIP-8 封裝 / 脈衝產生', stock: 9, color: '#c084fc', colorR: 45, colorG: 45, colorB: 50 },
+      { id: 'def-6', name: '5mm 紅色發光二極體', slot: 'B-02', category: '光電元件', spec: 'VF=1.8~2.2V / 長正短負', stock: 65, color: '#f43f5e', colorR: 215, colorG: 40, colorB: 40 },
+      { id: 'def-7', name: '1N4007 整流二極體', slot: 'B-03', category: '半導體IC', spec: '1A 1000V DO-41', stock: 35, color: '#38bdf8', colorR: 50, colorG: 50, colorB: 55 },
+      { id: 'def-8', name: '異常/破損零件', slot: 'A-04', category: '報廢隔離', spec: '請放置於隔離檢驗盒', stock: 4, color: '#f59e0b', colorR: 200, colorG: 150, colorB: 30, isWarning: true }
     ];
 
     let customProducts = [];
@@ -475,6 +475,31 @@
       }
     }
 
+    // 儲存前自動計算照片的平均色彩特徵
+    function calculatePhotoColorSignature(dataUrl) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          const cvs = document.createElement('canvas');
+          cvs.width = 30;
+          cvs.height = 30;
+          const ctx = cvs.getContext('2d');
+          ctx.drawImage(img, 0, 0, 30, 30);
+          const pData = ctx.getImageData(0, 0, 30, 30).data;
+          let r = 0, g = 0, b = 0;
+          const total = pData.length / 4;
+          for (let i = 0; i < pData.length; i += 4) {
+            r += pData[i];
+            g += pData[i + 1];
+            b += pData[i + 2];
+          }
+          resolve({ colorR: Math.round(r / total), colorG: Math.round(g / total), colorB: Math.round(b / total) });
+        };
+        img.onerror = () => resolve({ colorR: 90, colorG: 90, colorB: 90 });
+        img.src = dataUrl;
+      });
+    }
+
     async function saveProductToCloud() {
       const name = document.getElementById('input-item-name').value.trim();
       const slot = document.getElementById('input-item-slot').value.trim().toUpperCase();
@@ -491,6 +516,12 @@
       saveBtn.innerHTML = `<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> 永久同步上傳中...`;
       lucide.createIcons();
 
+      // 計算第一張照片的特徵指紋
+      let sig = { colorR: 100, colorG: 100, colorB: 100 };
+      if (stagedPhotos.length > 0) {
+        sig = await calculatePhotoColorSignature(stagedPhotos[0]);
+      }
+
       const newProduct = {
         id: 'prod_' + Date.now(),
         name: name,
@@ -499,6 +530,9 @@
         spec: spec || '無備註規格',
         stock: 10,
         photos: stagedPhotos,
+        colorR: sig.colorR,
+        colorG: sig.colorG,
+        colorB: sig.colorB,
         created_at: new Date().toISOString()
       };
 
@@ -550,7 +584,7 @@
       }
     }
 
-    // ==================== 4. 視訊鏡頭與背景差分防誤判掃描 ====================
+    // ==================== 4. 視訊鏡頭與精準防誤判掃描 ====================
     async function toggleCamera() {
       const video = document.getElementById('webcam');
       const placeholder = document.getElementById('cam-placeholder');
@@ -577,7 +611,7 @@
           calibBtn.disabled = false;
 
           statusDot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping";
-          statusLabel.innerText = "實時檢測中 (背景防誤判已啟動)";
+          statusLabel.innerText = "實時檢測中 (精準特徵過濾)";
 
           isWebcamOn = true;
           baselineBgData = null;
@@ -617,7 +651,7 @@
       const statusBadge = document.getElementById('scan-status');
       statusBadge.innerText = 'CALIBRATING...';
       statusBadge.className = 'text-xs font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40';
-      alert('已重新記錄當前空桌面作為背景基準！現在只有在放入零件時才會觸發辨識。');
+      alert('已重新記錄當前空桌面作為背景基準！');
     }
 
     function startAutoScanLoop() {
@@ -635,7 +669,7 @@
       }
     }
 
-    // 核心影像分析：加入背景差分比對，防止掃到桌子亂跳
+    // 核心影像分析與雜物過濾
     function processCameraFrame() {
       const video = document.getElementById('webcam');
       if (!video || video.videoWidth === 0) return;
@@ -646,7 +680,7 @@
       const ctx = canvas.getContext('2d');
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      // 取中央取景框區域 (40, 30, 80, 60) 分析色彩與相鄰邊界變化度
+      // 取中央取景框區域 (40, 30, 80, 60)
       const imgData = ctx.getImageData(40, 30, 80, 60);
       const data = imgData.data;
       const pixelCount = data.length / 4;
@@ -668,61 +702,71 @@
       const avgB = bSum / pixelCount;
       const edgeVariance = varianceSum / pixelCount;
 
-      // 剛開鏡頭時，自動採樣第一幀作為空桌面的顏色與亮度基準
+      // 初次採樣記錄空桌面底色
       if (!baselineBgData || !isCalibrated) {
         baselineBgData = { r: avgR, g: avgG, b: avgB, variance: edgeVariance };
         isCalibrated = true;
         return;
       }
 
-      // 計算當前畫面相較於空桌面的「色差變化」
       const diffFromBackground = Math.abs(avgR - baselineBgData.r) + 
                                  Math.abs(avgG - baselineBgData.g) + 
                                  Math.abs(avgB - baselineBgData.b);
 
-      // 判定是否有實體零件遮擋：色差 > 45 或邊緣對比變化度 > 14
-      const hasValidObject = (diffFromBackground > 45) || (edgeVariance > 14);
-
       const statusBadge = document.getElementById('scan-status');
 
-      if (!hasValidObject) {
-        // 若只有空桌子，維持待機狀態，絕不跳出辨識結果
+      // 1. 若只有空桌面，保持 WAITING
+      if (diffFromBackground < 35 && edgeVariance < 12) {
         statusBadge.innerText = 'WAITING (無零件)';
         statusBadge.className = 'text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700';
         return;
       }
 
-      // 冷卻時間防重複播報（2.5 秒）
+      // 2. 比對零件庫特徵相似度
+      const allItems = getAllItems();
+      const matchResult = matchItemWithConfidence(allItems, avgR, avgG, avgB);
+
+      // 【核心防亂跳門檻】：信心度未滿 78% 一律判定為雜物，不跳出結果也不播報
+      if (!matchResult || matchResult.confidence < 78) {
+        statusBadge.innerText = 'SCANNING (非清單零件/雜物)';
+        statusBadge.className = 'text-xs font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40';
+        return;
+      }
+
+      // 冷卻時間防止連續觸發（2.5 秒）
       const now = Date.now();
       if (now - lastIdentifiedTime < 2500) return;
 
-      const allItems = getAllItems();
-      if (allItems.length === 0) return;
-
-      const matchedItem = matchItemByVisualFeature(allItems, avgR, avgG, avgB);
-      if (matchedItem) {
-        lastIdentifiedTime = now;
-        simulateRecognition(matchedItem);
-      }
+      lastIdentifiedTime = now;
+      simulateRecognition(matchResult.item, matchResult.confidence);
     }
 
-    function matchItemByVisualFeature(items, r, g, b) {
-      const customOnes = items.filter(it => it.id && it.id.startsWith('prod_'));
-      if (customOnes.length > 0) {
-        const idx = Math.floor((r * 2 + g * 3 + b) % customOnes.length);
-        return customOnes[idx];
-      }
+    // 計算色差距離（歐氏距離）評估匹配信心
+    function matchItemWithConfidence(items, r, g, b) {
+      let bestItem = null;
+      let highestConf = 0;
 
-      // 預設元件庫比對
-      if (r > g + 25 && r > b + 25) {
-        return items.find(it => it.name.includes('LED')) || items[0];
-      } else if (b > r + 15) {
-        return items.find(it => it.name.includes('電解電容')) || items[2];
-      } else if (r < 70 && g < 70 && b < 70) {
-        return items.find(it => it.name.includes('555')) || items[4];
-      } else {
-        return items.find(it => it.name.includes('10k')) || items[0];
-      }
+      items.forEach(item => {
+        let tR = item.colorR || 100;
+        let tG = item.colorG || 100;
+        let tB = item.colorB || 100;
+
+        const dist = Math.sqrt(
+          Math.pow(r - tR, 2) + 
+          Math.pow(g - tG, 2) + 
+          Math.pow(b - tB, 2)
+        );
+
+        // 轉換為 0% ~ 99% 信心度
+        const conf = Math.max(0, Math.min(98, Math.round(100 - (dist / 2.3))));
+
+        if (conf > highestConf) {
+          highestConf = conf;
+          bestItem = item;
+        }
+      });
+
+      return { item: bestItem, confidence: highestConf };
     }
 
     // ==================== 5. 語音與歸位導引 ====================
@@ -743,9 +787,9 @@
       window.speechSynthesis.speak(utterance);
     }
 
-    function simulateRecognition(item) {
+    function simulateRecognition(item, confidence) {
       activeItem = item;
-      const conf = Math.floor(Math.random() * 7 + 93);
+      const conf = confidence || Math.floor(Math.random() * 6 + 93);
 
       document.getElementById('target-name').innerText = item.name;
       document.getElementById('target-slot').innerText = item.slot;
