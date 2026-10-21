@@ -136,10 +136,10 @@
               </div>
             </div>
 
-            <!-- 即時模型預測機率條 (Top Classes) -->
+            <!-- 即時模型預測機率條 (只顯示最高項目) -->
             <div class="mt-4 pt-3 border-t border-slate-800 space-y-2">
               <div class="flex items-center justify-between text-xs text-slate-400">
-                <span class="flex items-center gap-1"><i data-lucide="activity" class="w-3.5 h-3.5 text-indigo-400"></i> AI 神經網路預測機率 (Teachable Machine)：</span>
+                <span class="flex items-center gap-1"><i data-lucide="activity" class="w-3.5 h-3.5 text-indigo-400"></i> AI 當前最高機率預測：</span>
                 <span id="model-fps" class="font-mono text-[11px] text-slate-500">推論冷卻: 正常</span>
               </div>
               <div id="prediction-bars" class="space-y-1.5 text-xs">
@@ -252,7 +252,7 @@
       </div>
 
       <p class="text-xs text-slate-400 leading-relaxed">
-        請貼上您在 Google Teachable Machine 訓練完成並點擊 <b>Export Model -> Upload (shareable link)</b> 產生的雲端模型連結：
+        請貼上您在 Google Teachable Machine 訓練完成並點擊 <b>Export Model -&gt; Upload (shareable link)</b> 產生的雲端模型連結：
       </p>
 
       <div class="space-y-3 text-xs">
@@ -261,7 +261,7 @@
           <input id="cfg-tm-url" type="text" placeholder="https://teachablemachine.withgoogle.com/models/xxxxxx/" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-slate-200 font-mono">
         </div>
         <p class="text-[11px] text-slate-500">
-          💡 訓練提示：請務必建立一個標籤名為 <b>Background</b>（空桌面）的類別。當拍到桌子或雜物時，AI 會直接視為背景，完全不會亂跳零件名稱！
+          💡 訓練提示：請務必建立一個標籤名為 <b>Background</b> 或 <b>nothing</b>（空桌面）的類別。當拍到桌子或雜物時，AI 會直接視為背景，完全不會亂跳零件名稱！
         </p>
       </div>
 
@@ -388,7 +388,9 @@
         const topResult = predictions[0];
         const statusBadge = document.getElementById('scan-status');
 
-        if (topResult.className.toLowerCase().includes('background') || topResult.probability < 0.85) {
+        const isBg = topResult.className.toLowerCase().includes('background') || topResult.className.toLowerCase().includes('nothing');
+
+        if (isBg || topResult.probability < 0.85) {
           statusBadge.innerText = 'WAITING (無零件 / 背景)';
           statusBadge.className = 'text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700';
         } else {
@@ -403,25 +405,27 @@
       animationFrameId = requestAnimationFrame(predictLoop);
     }
 
+    // 只顯示最高機率的項目
     function renderPredictionBars(predictions) {
       const container = document.getElementById('prediction-bars');
-      container.innerHTML = predictions.slice(0, 4).map(p => {
-        const pct = Math.round(p.probability * 100);
-        const isBg = p.className.toLowerCase().includes('background');
-        const color = isBg ? 'bg-slate-600' : (pct > 80 ? 'bg-indigo-500' : 'bg-cyan-500');
+      if (!predictions || predictions.length === 0) return;
 
-        return `
-          <div class="space-y-0.5">
-            <div class="flex justify-between text-[11px] text-slate-300">
-              <span class="font-medium truncate max-w-[150px]">${p.className}</span>
-              <span class="font-mono text-slate-400">${pct}%</span>
-            </div>
-            <div class="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
-              <div class="${color} h-full transition-all duration-150" style="width: ${pct}%"></div>
-            </div>
+      const top = predictions[0];
+      const pct = Math.round(top.probability * 100);
+      const isBg = top.className.toLowerCase().includes('background') || top.className.toLowerCase().includes('nothing');
+      const color = isBg ? 'bg-slate-600' : (pct > 80 ? 'bg-indigo-500' : 'bg-cyan-500');
+
+      container.innerHTML = `
+        <div class="space-y-1">
+          <div class="flex justify-between text-xs text-slate-200">
+            <span class="font-bold text-sm text-white">${top.className}</span>
+            <span class="font-mono text-cyan-400 font-bold">${pct}%</span>
           </div>
-        `;
-      }).join('');
+          <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+            <div class="${color} h-full transition-all duration-150" style="width: ${pct}%"></div>
+          </div>
+        </div>
+      `;
     }
 
     function matchItemByName(className, conf) {
