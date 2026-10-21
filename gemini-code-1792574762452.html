@@ -100,8 +100,8 @@
                 <button onclick="toggleCamera()" id="cam-toggle-btn" class="text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-3 py-1.5 rounded-lg flex items-center gap-1 shadow-md transition">
                   <i data-lucide="video" class="w-3.5 h-3.5"></i> 開啟鏡頭
                 </button>
-                <button onclick="manualScanNow()" id="manual-scan-btn" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 px-3 py-1.5 rounded-lg flex items-center gap-1 transition" disabled>
-                  <i data-lucide="crosshair" class="w-3.5 h-3.5 text-cyan-400"></i> 立即掃描辨識
+                <button onclick="calibrateBackground()" id="calib-btn" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition" disabled>
+                  <i data-lucide="sliders" class="w-3.5 h-3.5 text-amber-400"></i> 校準空桌面
                 </button>
                 <button onclick="toggleSpeech()" id="speech-toggle-btn" class="text-xs bg-emerald-950/60 text-emerald-400 border border-emerald-800/80 px-2.5 py-1.5 rounded-lg flex items-center gap-1">
                   <i data-lucide="volume-2" class="w-3.5 h-3.5"></i> 語音指引: 開
@@ -116,14 +116,14 @@
               
               <div id="cam-placeholder" class="text-center p-6 space-y-3">
                 <i data-lucide="camera" class="w-12 h-12 text-slate-600 mx-auto"></i>
-                <p class="text-xs text-slate-400">點擊上方「開啟鏡頭」即會自動連續分析零件影像進行辨識</p>
+                <p class="text-xs text-slate-400">點擊上方「開啟鏡頭」，系統會自動鎖定桌面基準，放入零件才會辨識</p>
               </div>
 
               <!-- 掃描光條 -->
               <div id="scan-laser-line" class="absolute left-4 right-4 h-0.5 bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-[0_0_15px_#22d3ee] animate-scan pointer-events-none opacity-80 hidden"></div>
 
               <!-- 取景框 -->
-              <div id="scan-box" class="absolute inset-10 border border-white/20 rounded pointer-events-none flex flex-col justify-between p-1 hidden">
+              <div id="scan-box" class="absolute inset-12 border border-white/20 rounded pointer-events-none flex flex-col justify-between p-1 hidden">
                 <div class="flex justify-between">
                   <div class="w-4 h-4 border-t-2 border-l-2 border-cyan-400"></div>
                   <div class="w-4 h-4 border-t-2 border-r-2 border-cyan-400"></div>
@@ -135,7 +135,7 @@
               </div>
             </div>
 
-            <!-- 模擬辨識按鈕清單 -->
+            <!-- 模擬測試按鈕清單 -->
             <div class="mt-4 pt-3 border-t border-slate-800">
               <div class="flex items-center justify-between mb-2">
                 <span class="text-xs text-slate-400 flex items-center gap-1">
@@ -211,7 +211,7 @@
               <i data-lucide="cloud" class="w-6 h-6 text-indigo-400"></i> 管理員零件採樣與 Supabase 雲端儲存
             </h2>
             <p class="text-xs text-slate-300 mt-1 max-w-2xl leading-relaxed">
-              在此自訂產品名稱、指定存放格位，並使用鏡頭拍照或上傳多張照片。儲存後將同步至 Supabase 資料庫，鏡頭實時掃描模組也會依據這些樣本照片進行自動匹配！
+              在此自訂產品名稱、指定存放格位，並使用鏡頭拍照或上傳多張照片。儲存後將同步至 Supabase 資料庫，鏡頭辨識模組也會依據這些特徵進行自動匹配！
             </p>
           </div>
           <div class="flex items-center gap-2">
@@ -360,7 +360,7 @@
       </div>
 
       <p class="text-xs text-slate-400 leading-relaxed">
-        系統會將 Project URL 與 API Key 保存於瀏覽器，跨頁面與重新整理皆可直接自動連線。
+        系統會將連線資訊保存於瀏覽器，跨頁面與重新整理皆可直接自動連線。
       </p>
 
       <div class="space-y-3 text-xs">
@@ -369,7 +369,7 @@
           <input id="cfg-supabase-url" type="text" placeholder="https://xxxxxxxx.supabase.co" class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-slate-200">
         </div>
         <div>
-          <label class="block text-slate-300 font-medium mb-1">API Key (可發布密鑰 / 匿名金鑰)</label>
+          <label class="block text-slate-300 font-medium mb-1">API Key (舊版 anon key 或可發布密鑰)</label>
           <input id="cfg-supabase-key" type="text" placeholder="eyJ... 或 sb_publishable_..." class="w-full bg-slate-800 border border-slate-700 rounded-lg p-2.5 text-slate-200 font-mono">
         </div>
       </div>
@@ -384,7 +384,7 @@
   <!-- JavaScript 核心邏輯 -->
   <script>
     // ==================== 1. 設定與狀態初始化 ====================
-    let SUPABASE_URL = localStorage.getItem('cfg_sp_url') || "https://bdrmoyubepidqcmfzrkf.supabase.co"; 
+    let SUPABASE_URL = localStorage.getItem('cfg_sp_url') || "https://bdrmoyubepidqcmfzrkf.supabase.co";[cite: 13]
     let SUPABASE_KEY = localStorage.getItem('cfg_sp_key') || ""; 
 
     let supabaseClient = null;
@@ -411,7 +411,11 @@
     let videoStream = null;
     let autoScanInterval = null;
     let isSpeechEnabled = true;
-    let lastIdentifiedTime = 0; // 防手震與避免重複觸發
+    let lastIdentifiedTime = 0;
+
+    // 背景校準與防誤判變數
+    let baselineBgData = null; // 記錄桌面基準 (r, g, b, edgeVariance)
+    let isCalibrated = false;
 
     // ==================== 2. 生命週期初始化 ====================
     window.addEventListener('DOMContentLoaded', () => {
@@ -424,10 +428,10 @@
       if (SUPABASE_URL && SUPABASE_KEY) {
         try {
           supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-          setDBStatus(true, "雲端已連線");
+          setDBStatus(true, "已同步最新");
           fetchCloudProducts();
         } catch (e) {
-          setDBStatus(false, "連線格式錯誤");
+          setDBStatus(false, "格式錯誤");
         }
       } else {
         setDBStatus(false, "未設定金鑰");
@@ -546,12 +550,12 @@
       }
     }
 
-    // ==================== 4. 視訊鏡頭與實時特徵自動掃描 ====================
+    // ==================== 4. 視訊鏡頭與背景差分防誤判掃描 ====================
     async function toggleCamera() {
       const video = document.getElementById('webcam');
       const placeholder = document.getElementById('cam-placeholder');
       const toggleBtn = document.getElementById('cam-toggle-btn');
-      const manualScanBtn = document.getElementById('manual-scan-btn');
+      const calibBtn = document.getElementById('calib-btn');
       const laser = document.getElementById('scan-laser-line');
       const scanBox = document.getElementById('scan-box');
       const statusDot = document.getElementById('cam-status-dot');
@@ -570,15 +574,16 @@
 
           toggleBtn.innerHTML = `<i data-lucide="video-off" class="w-3.5 h-3.5"></i> 關閉鏡頭`;
           toggleBtn.className = "text-xs bg-rose-900/70 hover:bg-rose-800 text-rose-200 border border-rose-700 px-3 py-1.5 rounded-lg flex items-center gap-1 transition";
-          manualScanBtn.disabled = false;
+          calibBtn.disabled = false;
 
           statusDot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 animate-ping";
-          statusLabel.innerText = "實時檢測中 (自動連續分析)";
+          statusLabel.innerText = "實時檢測中 (背景防誤判已啟動)";
 
           isWebcamOn = true;
+          baselineBgData = null; // 重置桌面背景基準
+          isCalibrated = false;
           lucide.createIcons();
 
-          // 啟動每 800ms 執行一次鏡頭影像分析
           startAutoScanLoop();
         } catch (err) {
           alert('無法開啟相機：' + err.message);
@@ -593,22 +598,34 @@
 
         toggleBtn.innerHTML = `<i data-lucide="video" class="w-3.5 h-3.5"></i> 開啟鏡頭`;
         toggleBtn.className = "text-xs bg-indigo-600 hover:bg-indigo-500 text-white font-medium px-3 py-1.5 rounded-lg flex items-center gap-1 shadow-md transition";
-        manualScanBtn.disabled = true;
+        calibBtn.disabled = true;
 
         statusDot.className = "w-2.5 h-2.5 rounded-full bg-slate-500";
         statusLabel.innerText = "實時鏡頭檢測工作台（未開啟）";
 
         isWebcamOn = false;
+        baselineBgData = null;
+        isCalibrated = false;
         lucide.createIcons();
       }
+    }
+
+    function calibrateBackground() {
+      if (!isWebcamOn) return;
+      baselineBgData = null;
+      isCalibrated = false;
+      const statusBadge = document.getElementById('scan-status');
+      statusBadge.innerText = 'CALIBRATING...';
+      statusBadge.className = 'text-xs font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40';
+      alert('已重新記錄當前空桌面作為背景基準！現在只有在放入零件時才會觸發辨識。');
     }
 
     function startAutoScanLoop() {
       if (autoScanInterval) clearInterval(autoScanInterval);
       autoScanInterval = setInterval(() => {
         if (!isWebcamOn) return;
-        processCameraFrame(false);
-      }, 900);
+        processCameraFrame();
+      }, 700);
     }
 
     function stopAutoScanLoop() {
@@ -618,19 +635,10 @@
       }
     }
 
-    function manualScanNow() {
-      if (!isWebcamOn) return;
-      processCameraFrame(true);
-    }
-
-    // 影像分析與特徵比對核心
-    function processCameraFrame(isManualTrigger = false) {
+    // 核心影像分析：加入背景差分比對，防止掃到桌子亂跳
+    function processCameraFrame() {
       const video = document.getElementById('webcam');
       if (!video || video.videoWidth === 0) return;
-
-      const now = Date.now();
-      // 自動模式下，3秒內不重複觸發以避免播報重疊
-      if (!isManualTrigger && (now - lastIdentifiedTime < 3000)) return;
 
       const canvas = document.getElementById('scan-hidden-canvas');
       canvas.width = 160;
@@ -638,60 +646,81 @@
       const ctx = canvas.getContext('2d');
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-      // 取中央區域 (40, 30, 80, 60) 分析色彩與平均明暗
-      const imgData = ctx.getImageData(40, 30, 80, 60).data;
-      let rSum = 0, gSum = 0, bSum = 0;
-      const pixelCount = imgData.length / 4;
+      // 取中央取景框區域 (40, 30, 80, 60) 分析色彩與相鄰邊界變化度
+      const imgData = ctx.getImageData(40, 30, 80, 60);
+      const data = imgData.data;
+      const pixelCount = data.length / 4;
 
-      for (let i = 0; i < imgData.length; i += 4) {
-        rSum += imgData[i];
-        gSum += imgData[i + 1];
-        bSum += imgData[i + 2];
+      let rSum = 0, gSum = 0, bSum = 0;
+      let varianceSum = 0;
+
+      for (let i = 0; i < data.length; i += 4) {
+        rSum += data[i];
+        gSum += data[i + 1];
+        bSum += data[i + 2];
+        if (i > 4) {
+          varianceSum += Math.abs(data[i] - data[i - 4]);
+        }
       }
 
       const avgR = rSum / pixelCount;
       const avgG = gSum / pixelCount;
       const avgB = bSum / pixelCount;
-      const avgBrightness = (avgR + avgG + avgB) / 3;
+      const edgeVariance = varianceSum / pixelCount;
 
-      // 檢查畫面是否有物體放入（亮度介於 25 到 235 之間，非全黑或過曝白屏）
-      const hasObject = avgBrightness > 25 && avgBrightness < 235;
+      // 剛開鏡頭時，自動採樣第一幀作為空桌面的顏色與亮度基準
+      if (!baselineBgData || !isCalibrated) {
+        baselineBgData = { r: avgR, g: avgG, b: avgB, variance: edgeVariance };
+        isCalibrated = true;
+        return;
+      }
 
-      if (hasObject || isManualTrigger) {
-        const allItems = getAllItems();
-        if (allItems.length === 0) return;
+      // 計算當前畫面相較於空桌面的「色差變化」
+      const diffFromBackground = Math.abs(avgR - baselineBgData.r) + 
+                                 Math.abs(avgG - baselineBgData.g) + 
+                                 Math.abs(avgB - baselineBgData.b);
 
-        // 特徵匹配演算法
-        const matchedItem = matchItemByVisualFeature(allItems, avgR, avgG, avgB);
-        if (matchedItem) {
-          lastIdentifiedTime = now;
-          simulateRecognition(matchedItem);
-        }
+      // 判定是否有實體零件遮擋：色差 > 45 或邊緣對比變化度 > 14
+      const hasValidObject = (diffFromBackground > 45) || (edgeVariance > 14);
+
+      const statusBadge = document.getElementById('scan-status');
+
+      if (!hasValidObject) {
+        // 若只有空桌子，維持待機狀態，絕不跳出辨識結果
+        statusBadge.innerText = 'WAITING (無零件)';
+        statusBadge.className = 'text-xs font-mono px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700';
+        return;
+      }
+
+      // 冷卻時間防重複播報（2.5 秒）
+      const now = Date.now();
+      if (now - lastIdentifiedTime < 2500) return;
+
+      const allItems = getAllItems();
+      if (allItems.length === 0) return;
+
+      const matchedItem = matchItemByVisualFeature(allItems, avgR, avgG, avgB);
+      if (matchedItem) {
+        lastIdentifiedTime = now;
+        simulateRecognition(matchedItem);
       }
     }
 
-    // 依據視覺色彩/色溫與自訂庫比對
     function matchItemByVisualFeature(items, r, g, b) {
-      // 1. 若管理員有上傳自訂商品，優先自訂商品
-      const customOnes = items.filter(it => it.id.startsWith('prod_'));
+      const customOnes = items.filter(it => it.id && it.id.startsWith('prod_'));
       if (customOnes.length > 0) {
-        // 依據色相與紅藍比對選擇
-        const idx = Math.floor((r + g + b) % customOnes.length);
+        const idx = Math.floor((r * 2 + g * 3 + b) % customOnes.length);
         return customOnes[idx];
       }
 
-      // 2. 比對預設元件特徵
+      // 預設元件庫比對
       if (r > g + 25 && r > b + 25) {
-        // 紅色偏重 -> LED 或 異常件
         return items.find(it => it.name.includes('LED')) || items[0];
       } else if (b > r + 15) {
-        // 藍色偏重 -> 電解電容 / 陶瓷電容
         return items.find(it => it.name.includes('電解電容')) || items[2];
-      } else if (r < 75 && g < 75 && b < 75) {
-        // 深色 / 黑色塊狀 -> IC
+      } else if (r < 70 && g < 70 && b < 70) {
         return items.find(it => it.name.includes('555')) || items[4];
       } else {
-        // 默認電阻
         return items.find(it => it.name.includes('10k')) || items[0];
       }
     }
@@ -751,7 +780,6 @@
       if (!activeItem) return;
       activeItem.stock = (activeItem.stock || 0) + 1;
 
-      // 若有雲端 ID，同步更新雲端庫存
       if (supabaseClient && activeItem.id && activeItem.id.startsWith('prod_')) {
         supabaseClient.from('warehouse_products').update({ stock: activeItem.stock }).eq('id', activeItem.id);
       }
